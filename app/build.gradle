@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    namespace 'com.sosh.remote'
     compileSdk 34
     defaultConfig {
         applicationId "com.sosh.remote"
