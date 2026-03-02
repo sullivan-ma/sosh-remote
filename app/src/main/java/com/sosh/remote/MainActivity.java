@@ -124,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean testConnection(String ip) {
         try {
             HttpURLConnection c = (HttpURLConnection)
-                new URL("http://" + ip + "/remoteControl/cmd?operation=10").openConnection();
+                new URL("http://" + ip + ":8080/remoteControl/cmd?operation=10").openConnection();
             c.setConnectTimeout(3000);
             c.setReadTimeout(3000);
             c.connect();
@@ -150,9 +150,8 @@ public class MainActivity extends AppCompatActivity {
         }
         String keyCode = KEY_MAP.get(cmd);
         if (keyCode == null) return;
-        String url = "http://" + decoderIP
-                + "/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=0";
-
+        String url = "http://" + decoder Ip 
+            + ":8080/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=0";
         executor.execute(() -> {
             try {
                 HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -231,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
     private String probeDecoder(String ip) {
         try {
             HttpURLConnection c = (HttpURLConnection)
-                new URL("http://" + ip + "/remoteControl/cmd?operation=10").openConnection();
+                new URL("http://" + ip + ":8080/remoteControl/cmd?operation=10").openConnection();
             c.setConnectTimeout(800);
             c.setReadTimeout(800);
             c.connect();
