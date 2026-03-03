@@ -129,17 +129,30 @@ public class MainActivity extends AppCompatActivity {
 
         executor.execute(() -> {
             try {
-                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                c.setConnectTimeout(2000);
-                c.setReadTimeout(2000);
-                int code = c.getResponseCode();
-                c.disconnect();
-                if (code < 200 || code >= 300) {
-                    throw new IOException("HTTP " + code);
-                }
+                // Étape 1 : appui
+                String urlPress = "http://" + decoderIP
+                    + ":8080/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=1";
+                HttpURLConnection c1 = (HttpURLConnection) new URL(urlPress).openConnection();
+                c1.setConnectTimeout(2000);
+                c1.setReadTimeout(2000);
+                c1.connect();
+                c1.getResponseCode();
+                c1.disconnect();
+        
+                Thread.sleep(100);
+        
+                // Étape 2 : relâcher
+                String urlRelease = "http://" + decoderIP
+                    + ":8080/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=2";
+                HttpURLConnection c2 = (HttpURLConnection) new URL(urlRelease).openConnection();
+                c2.setConnectTimeout(2000);
+                c2.setReadTimeout(2000);
+                c2.connect();
+                c2.getResponseCode();
+                c2.disconnect();
+        
             } catch (Exception e) {
-                mainHandler.post(() ->
-                        toast("Erreur réseau : " + e.getMessage()));
+                mainHandler.post(() -> toast("❌ " + e.getMessage()));
             }
         });
     }
