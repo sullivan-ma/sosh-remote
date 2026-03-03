@@ -209,10 +209,48 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addFoundDevice(String ip) {
-        TextView tv = new TextView(this);
-        tv.setText("📺 Décodeur trouvé : " + ip);
-        tv.setPadding(8, 8, 8, 8);
-        scanResults.addView(tv);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(16, 14, 16, 14);
+        row.setBackgroundColor(0xFF1C1C28);
+    
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL);
+        info.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+    
+        TextView nameView = new TextView(this);
+        nameView.setText("📺 Décodeur Sosh");
+        nameView.setTextColor(0xFFE8531A);
+        nameView.setTextSize(14);
+        nameView.setTypeface(null, android.graphics.Typeface.BOLD);
+    
+        TextView ipView = new TextView(this);
+        ipView.setText(ip);
+        ipView.setTextColor(0xFF888899);
+        ipView.setTextSize(12);
+    
+        info.addView(nameView);
+        info.addView(ipView);
+    
+        Button btn = new Button(this);
+        btn.setText("Utiliser");
+        btn.setBackgroundColor(0xFFE8531A);
+        btn.setTextColor(0xFFFFFFFF);
+        btn.setOnClickListener(v -> {
+            ipInput.setText(ip);
+            connect();
+        });
+    
+        row.addView(info);
+        row.addView(btn);
+    
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        p.setMargins(0, 4, 0, 4);
+        row.setLayoutParams(p);
+        scanResults.addView(row);
     }
 
     private String detectSubnet() {
