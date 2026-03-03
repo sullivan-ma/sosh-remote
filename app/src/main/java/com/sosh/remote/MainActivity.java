@@ -1,294 +1,243 @@
-package com.sosh.remote;
+package com.sosh.remote
 
-import java.io.IOException;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.view.View;
-import android.widget.*;
-import androidx.appcompat.app.AppCompatActivity;
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import okhttp3.*
+import java.io.IOException
+import java.net.NetworkInterface
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.*;
-import java.util.*;
-import java.util.concurrent.*;
+class MainActivity : AppCompatActivity() {
 
-public class MainActivity extends AppCompatActivity {
+    private val client = OkHttpClient()
+    private var decoderIp: String? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val executor = Executors.newCachedThreadPool()
 
-    private EditText ipInput;
-    private TextView statusText;
-    private View statusDot;
-    private LinearLayout scanResults;
-    private ProgressBar scanProgress;
-    private TextView scanProgressText;
-    private TextView scanStatus;
-    private ScrollView scanPanel;
+    private val keyMap = mapOf(
+        "POWER" to "116",  "MUTE"  to "113",
+        "HOME"  to "125",  "GUIDE" to "362",
+        "VOD"   to "393",  "UP"    to "103",
+        "DOWN"  to "108",  "LEFT"  to "105",
+        "RIGHT" to "106",  "OK"    to "28",
+        "BACK"  to "158",  "MENU"  to "139",
+        "VOL_UP"    to "115", "VOL_DOWN"  to "114",
+        "CH_UP"     to "402", "CH_DOWN"   to "403",
+        "PLAY_PAUSE" to "164", "STOP"     to "128",
+        "REW"   to "168",  "FFW"   to "159",
+        "REC"   to "167",  "PREV"  to "165",
+        "NEXT"  to "163",  "RED"   to "398",
+        "GREEN" to "399",  "YELLOW" to "400",
+        "BLUE"  to "401",  "TEXT"  to "388",
+        "0" to "512", "1" to "513", "2" to "514",
+        "3" to "515", "4" to "516", "5" to "517",
+        "6" to "518", "7" to "519", "8" to "520", "9" to "521"
+    )
 
-    private String decoderIP = "";
-    private boolean connected = false;
-
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newCachedThreadPool();
-
-    private static final Map<String, String> KEY_MAP = new HashMap<>();
-    static {
-        KEY_MAP.put("POWER","116"); KEY_MAP.put("MUTE","113");
-        KEY_MAP.put("HOME","125");  KEY_MAP.put("GUIDE","362");
-        KEY_MAP.put("VOD","393");   KEY_MAP.put("UP","103");
-        KEY_MAP.put("DOWN","108");  KEY_MAP.put("LEFT","105");
-        KEY_MAP.put("RIGHT","106"); KEY_MAP.put("OK","352");
-        KEY_MAP.put("BACK","158");  KEY_MAP.put("MENU","139");
-        KEY_MAP.put("VOL_UP","115"); KEY_MAP.put("VOL_DOWN","114");
-        KEY_MAP.put("CH_UP","402"); KEY_MAP.put("CH_DOWN","403");
-        KEY_MAP.put("PLAY_PAUSE","164"); KEY_MAP.put("STOP","128");
-        KEY_MAP.put("REW","168");   KEY_MAP.put("FFW","159");
-        KEY_MAP.put("REC","167");   KEY_MAP.put("PREV","165");
-        KEY_MAP.put("NEXT","163");  KEY_MAP.put("RED","398");
-        KEY_MAP.put("GREEN","399"); KEY_MAP.put("YELLOW","400");
-        KEY_MAP.put("BLUE","401");  KEY_MAP.put("TEXT","388");
-        KEY_MAP.put("0","512"); KEY_MAP.put("1","513");
-        KEY_MAP.put("2","514"); KEY_MAP.put("3","515");
-        KEY_MAP.put("4","516"); KEY_MAP.put("5","517");
-        KEY_MAP.put("6","518"); KEY_MAP.put("7","519");
-        KEY_MAP.put("8","520"); KEY_MAP.put("9","521");
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        setupButtons()
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        ipInput          = findViewById(R.id.ip_input);
-        statusText       = findViewById(R.id.status_text);
-        statusDot        = findViewById(R.id.status_dot);
-        scanResults      = findViewById(R.id.scan_results);
-        scanProgress     = findViewById(R.id.scan_progress);
-        scanProgressText = findViewById(R.id.scan_progress_text);
-        scanStatus       = findViewById(R.id.scan_status);
-        scanPanel        = findViewById(R.id.scan_panel);
-
-        setupButtons();
-    }
-
-    private void setupButtons() {
-        findViewById(R.id.btn_connect).setOnClickListener(v -> connect());
-        findViewById(R.id.btn_scan).setOnClickListener(v -> startScan());
-    }
-
-    private void connect() {
-        String ip = ipInput.getText().toString().trim();
-        if (ip.isEmpty()) {
-            toast("Entrez une adresse IP");
-            return;
+    private fun setupButtons() {
+        findViewById<View>(R.id.btn_connect).setOnClickListener { connectManual() }
+        findViewById<View>(R.id.btn_scan).setOnClickListener { startScan() }
+        mapOf(
+            R.id.btn_power to "POWER",    R.id.btn_mute    to "MUTE",
+            R.id.btn_home  to "HOME",     R.id.btn_guide   to "GUIDE",
+            R.id.btn_vod   to "VOD",      R.id.btn_up      to "UP",
+            R.id.btn_down  to "DOWN",     R.id.btn_left    to "LEFT",
+            R.id.btn_right to "RIGHT",    R.id.btn_ok      to "OK",
+            R.id.btn_back  to "BACK",     R.id.btn_menu_btn to "MENU",
+            R.id.btn_vol_up   to "VOL_UP",   R.id.btn_vol_down to "VOL_DOWN",
+            R.id.btn_ch_up    to "CH_UP",    R.id.btn_ch_down  to "CH_DOWN",
+            R.id.btn_prev  to "PREV",     R.id.btn_rew     to "REW",
+            R.id.btn_play  to "PLAY_PAUSE", R.id.btn_ffw   to "FFW",
+            R.id.btn_next  to "NEXT",     R.id.btn_stop    to "STOP",
+            R.id.btn_rec   to "REC",      R.id.btn_red     to "RED",
+            R.id.btn_green to "GREEN",    R.id.btn_yellow  to "YELLOW",
+            R.id.btn_blue  to "BLUE",     R.id.btn_text    to "TEXT",
+            R.id.btn_0 to "0", R.id.btn_1 to "1", R.id.btn_2 to "2",
+            R.id.btn_3 to "3", R.id.btn_4 to "4", R.id.btn_5 to "5",
+            R.id.btn_6 to "6", R.id.btn_7 to "7", R.id.btn_8 to "8",
+            R.id.btn_9 to "9"
+        ).forEach { (id, cmd) ->
+            findViewById<View>(id)?.setOnClickListener { sendCommand(cmd) }
         }
+    }
 
-        decoderIP = ip;
-        connected = false;
-        setStatus("connecting", "Connexion en cours…");
+    private fun connectManual() {
+        val ip = findViewById<EditText>(R.id.ip_input).text.toString().trim()
+        if (ip.isEmpty()) { toast("Entrez une adresse IP"); return }
+        connectToIp(ip)
+    }
 
-        executor.execute(() -> {
-            boolean ok = testConnection(ip);
-            mainHandler.post(() -> {
-                if (ok) {
-                    connected = true;
-                    setStatus("connected", "✅ Connecté — " + decoderIP);
-                } else {
-                    setStatus("error", "❌ Connexion impossible");
+    private fun connectToIp(ip: String) {
+        setStatus("connecting", "Connexion en cours…")
+        client.newCall(
+            Request.Builder().url("http://$ip:8080/remoteControl/cmd?operation=10").build()
+        ).enqueue(object : Callback {
+            override fun onResponse(call: Call, response: Response) {
+                decoderIp = ip
+                response.close()
+                mainHandler.post {
+                    setStatus("connected", "✅ Connecté — $ip")
+                    toast("Décodeur connecté !")
                 }
-            });
-        });
-    }
-
-    private boolean testConnection(String ip) {
-        try {
-            HttpURLConnection c = (HttpURLConnection)
-                    new URL("http://" + ip + ":8080/remoteControl/cmd?operation=10")
-                            .openConnection();
-            c.setConnectTimeout(3000);
-            c.setReadTimeout(3000);
-            int code = c.getResponseCode();
-            c.disconnect();
-            return code >= 200 && code < 300;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void sendCommand(String cmd) {
-        if (!connected || decoderIP.isEmpty()) {
-            toast("Connectez-vous d'abord au décodeur");
-            return;
-        }
-
-        String keyCode = KEY_MAP.get(cmd);
-        if (keyCode == null) return;
-
-        String url = "http://" + decoderIP +
-                ":8080/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=0";
-
-        executor.execute(() -> {
-            try {
-                // Étape 1 : appui
-                String urlPress = "http://" + decoderIP
-                    + ":8080/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=1";
-                HttpURLConnection c1 = (HttpURLConnection) new URL(urlPress).openConnection();
-                c1.setConnectTimeout(2000);
-                c1.setReadTimeout(2000);
-                c1.connect();
-                c1.getResponseCode();
-                c1.disconnect();
-        
-                Thread.sleep(100);
-        
-                // Étape 2 : relâcher
-                String urlRelease = "http://" + decoderIP
-                    + ":8080/remoteControl/cmd?operation=01&key=" + keyCode + "&mode=2";
-                HttpURLConnection c2 = (HttpURLConnection) new URL(urlRelease).openConnection();
-                c2.setConnectTimeout(2000);
-                c2.setReadTimeout(2000);
-                c2.connect();
-                c2.getResponseCode();
-                c2.disconnect();
-        
-            } catch (Exception e) {
-                mainHandler.post(() -> toast("❌ " + e.getMessage()));
             }
-        });
-    }
-
-    private void startScan() {
-        scanPanel.setVisibility(View.VISIBLE);
-        scanResults.removeAllViews();
-        scanProgress.setProgress(0);
-        scanProgressText.setText("0/254");
-
-        executor.execute(() -> {
-            String subnet = detectSubnet();
-            ExecutorService pool = Executors.newFixedThreadPool(50);
-            int[] done = {0};
-
-            try {
-                for (int i = 1; i <= 254; i++) {
-                    final int host = i;
-                    pool.execute(() -> {
-                        String ip = subnet + "." + host;
-                        if (probeDecoder(ip)) {
-                            mainHandler.post(() -> addFoundDevice(ip));
-                        }
-                        int d;
-                        synchronized (done) {
-                            done[0]++;
-                            d = done[0];
-                        }
-                        mainHandler.post(() -> {
-                            scanProgress.setProgress(d);
-                            scanProgressText.setText(d + "/254");
-                        });
-                    });
+            override fun onFailure(call: Call, e: IOException) {
+                mainHandler.post {
+                    setStatus("error", "❌ Impossible de joindre $ip")
+                    toast("Connexion échouée")
                 }
-            } finally {
-                pool.shutdown();
             }
-        });
+        })
     }
 
-    private boolean probeDecoder(String ip) {
-        try {
-            HttpURLConnection c = (HttpURLConnection)
-                    new URL("http://" + ip + ":8080/remoteControl/cmd?operation=10")
-                            .openConnection();
-            c.setConnectTimeout(800);
-            c.setReadTimeout(800);
-            int code = c.getResponseCode();
-            c.disconnect();
-            return code >= 200 && code < 300;
-        } catch (Exception e) {
-            return false;
+    private fun sendCommand(cmd: String) {
+        val ip = decoderIp ?: run { toast("Connectez-vous d'abord"); return }
+        val key = keyMap[cmd] ?: return
+        val url = "http://$ip:8080/remoteControl/cmd?operation=01&key=$key&mode=0"
+        client.newCall(Request.Builder().url(url).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                mainHandler.post { toast("❌ ${e.message}") }
+            }
+            override fun onResponse(call: Call, response: Response) { response.close() }
+        })
+    }
+
+    private fun startScan() {
+        val scanPanel   = findViewById<ScrollView>(R.id.scan_panel)
+        val scanResults = findViewById<LinearLayout>(R.id.scan_results)
+        val scanStatus  = findViewById<TextView>(R.id.scan_status)
+        val scanProg    = findViewById<ProgressBar>(R.id.scan_progress)
+        val scanProgTxt = findViewById<TextView>(R.id.scan_progress_text)
+
+        scanPanel.visibility = View.VISIBLE
+        scanResults.removeAllViews()
+        scanProg.progress = 0
+
+        executor.execute {
+            val subnet = detectSubnet()
+            mainHandler.post { scanStatus.text = "🔍 Scan de $subnet.1–254…" }
+
+            val found = mutableListOf<String>()
+            var done = 0
+            val pool = Executors.newFixedThreadPool(50)
+
+            (1..254).map { host ->
+                pool.submit {
+                    val ip = "$subnet.$host"
+                    try {
+                        val fastClient = OkHttpClient.Builder()
+                            .connectTimeout(800, TimeUnit.MILLISECONDS)
+                            .readTimeout(800, TimeUnit.MILLISECONDS)
+                            .build()
+                        val resp = fastClient.newCall(
+                            Request.Builder()
+                                .url("http://$ip:8080/remoteControl/cmd?operation=10")
+                                .build()
+                        ).execute()
+                        if (resp.isSuccessful) {
+                            synchronized(found) { found.add(ip) }
+                            mainHandler.post { addFoundDevice(ip, scanResults) }
+                        }
+                        resp.close()
+                    } catch (e: Exception) { }
+                    val d = synchronized(this) { ++done }
+                    mainHandler.post {
+                        scanProg.progress = d
+                        scanProgTxt.text = "$d/254"
+                    }
+                }
+            }.forEach { it.get() }
+            pool.shutdown()
+
+            mainHandler.post {
+                scanStatus.text = if (found.isEmpty())
+                    "😕 Aucun décodeur trouvé"
+                else "✅ ${found.size} décodeur(s) trouvé(s) !"
+            }
         }
     }
 
-    private void addFoundDevice(String ip) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(16, 14, 16, 14);
-        row.setBackgroundColor(0xFF1C1C28);
-    
-        LinearLayout info = new LinearLayout(this);
-        info.setOrientation(LinearLayout.VERTICAL);
-        info.setLayoutParams(new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-    
-        TextView nameView = new TextView(this);
-        nameView.setText("📺 Décodeur Sosh");
-        nameView.setTextColor(0xFFE8531A);
-        nameView.setTextSize(14);
-        nameView.setTypeface(null, android.graphics.Typeface.BOLD);
-    
-        TextView ipView = new TextView(this);
-        ipView.setText(ip);
-        ipView.setTextColor(0xFF888899);
-        ipView.setTextSize(12);
-    
-        info.addView(nameView);
-        info.addView(ipView);
-    
-        Button btn = new Button(this);
-        btn.setText("Utiliser");
-        btn.setBackgroundColor(0xFFE8531A);
-        btn.setTextColor(0xFFFFFFFF);
-        btn.setOnClickListener(v -> {
-            ipInput.setText(ip);
-            connect();
-        });
-    
-        row.addView(info);
-        row.addView(btn);
-    
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
+    private fun addFoundDevice(ip: String, container: LinearLayout) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(16, 14, 16, 14)
+            setBackgroundColor(0xFF1C1C28.toInt())
+            layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        p.setMargins(0, 4, 0, 4);
-        row.setLayoutParams(p);
-        scanResults.addView(row);
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 4, 0, 4) }
+        }
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        info.addView(TextView(this).apply {
+            text = "📺 Décodeur Sosh"
+            setTextColor(0xFFE8531A.toInt())
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        })
+        info.addView(TextView(this).apply {
+            text = ip
+            setTextColor(0xFF888899.toInt())
+            textSize = 12f
+        })
+        row.addView(info)
+        row.addView(Button(this).apply {
+            text = "Utiliser"
+            setBackgroundColor(0xFFE8531A.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            setOnClickListener {
+                findViewById<EditText>(R.id.ip_input).setText(ip)
+                connectToIp(ip)
+            }
+        })
+        container.addView(row)
     }
 
-    private String detectSubnet() {
+    private fun detectSubnet(): String {
         try {
-            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
-            while (ifaces.hasMoreElements()) {
-                NetworkInterface ni = ifaces.nextElement();
-                if (ni.isLoopback() || !ni.isUp()) continue;
-                for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
-                    String ip = ia.getAddress().getHostAddress();
-                    if (ip != null && ip.startsWith("192.168.")) {
-                        String[] p = ip.split("\\.");
-                        return p[0] + "." + p[1] + "." + p[2];
+            NetworkInterface.getNetworkInterfaces()?.toList()?.forEach { ni ->
+                if (ni.isLoopback || !ni.isUp) return@forEach
+                ni.interfaceAddresses.forEach { ia ->
+                    val ip = ia.address.hostAddress ?: return@forEach
+                    if (ip.startsWith("192.168.") || ip.startsWith("10.")) {
+                        val p = ip.split(".")
+                        if (p.size == 4) return "${p[0]}.${p[1]}.${p[2]}"
                     }
                 }
             }
-        } catch (Exception ignored) {}
-        return "192.168.1";
+        } catch (e: Exception) { }
+        return "192.168.1"
     }
 
-    private void setStatus(String state, String msg) {
-        statusText.setText(msg);
-        if ("connected".equals(state)) {
-            statusDot.setBackgroundResource(R.drawable.dot_green);
-        } else if ("error".equals(state)) {
-            statusDot.setBackgroundResource(R.drawable.dot_red);
-        } else {
-            statusDot.setBackgroundResource(R.drawable.dot_orange);
-        }
+    private fun setStatus(state: String, msg: String) {
+        findViewById<TextView>(R.id.status_text).text = msg
+        findViewById<View>(R.id.status_dot).setBackgroundResource(
+            when (state) {
+                "connected" -> R.drawable.dot_green
+                "error"     -> R.drawable.dot_red
+                else        -> R.drawable.dot_orange
+            }
+        )
     }
 
-    private void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+    private fun toast(msg: String) =
+        mainHandler.post { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        executor.shutdownNow();
+    override fun onDestroy() {
+        super.onDestroy()
+        executor.shutdownNow()
     }
 }
